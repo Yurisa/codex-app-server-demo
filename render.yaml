@@ -9,9 +9,11 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 24
-      - key: OPENAI_API_KEY
+      - key: AI_API_KEY
         sync: false
-      - key: OPENAI_MODEL
-        sync: false
+      - key: AI_MODEL
+        value: deepseek-flash
+      - key: AI_BASE_URL
+        value: https://api.deepseek.com
       - key: CHAT_ACCESS_TOKEN
         generateValue: true

@@ -7,7 +7,7 @@
 ```bash
 npm ci
 cp .env.example .env
-# 在 .env 中填写 OPENAI_API_KEY、OPENAI_MODEL、CHAT_ACCESS_TOKEN
+# 在 .env 中填写 AI_API_KEY、AI_MODEL、CHAT_ACCESS_TOKEN
 npm start
 ```
 
@@ -15,14 +15,14 @@ npm start
 无需配置密钥即可打开页面；真实聊天必须配置以上三项。访问口令由你自行设置，与模型 API 密钥不同，在聊天页输入。不要把 API 密钥放进网页或提交到 Git。
 
 - 多轮聊天保留在当前页面内存，刷新、新建对话后清除，不写入浏览器存储。
-- 使用 OpenAI Chat Completions 文本接口，模型名称由环境变量指定。
+- 使用兼容 Chat Completions 的文本接口，默认使用 DeepSeek 非思考模式。服务地址与模型由环境变量指定。
 - 失败消息恢复到输入框，服务端超时 60 秒，单条最多 8000 字，一次最多 40 条。
 - 服务端最多并发 3 次调用，每进程每分钟最多 20 次请求；多实例部署需要共享限流。
 - `/api/status` 只证明服务在线。AI 已配置不代表有额度或调用成功；成功调用记录随进程重启清除。
 
 ## 发布到 Render
 
-仓库已包含 `render.yaml`。在 Render 创建 Blueprint 并选择此仓库，填写 `OPENAI_API_KEY` 和 `OPENAI_MODEL`。平台生成 `CHAT_ACCESS_TOKEN`，从环境变量设置中获取后用于聊天页。应用读取平台提供的 `PORT`，监听 `0.0.0.0`。
+仓库已包含 `render.yaml`。在 Render 创建 Blueprint 并选择此仓库，填写 `AI_API_KEY` 和 `AI_MODEL`。平台生成 `CHAT_ACCESS_TOKEN`，从环境变量设置中获取后用于聊天页。应用读取平台提供的 `PORT`，监听 `0.0.0.0`。
 
 也可以手动创建 Node Web Service：构建命令 `npm ci`，启动命令 `npm start`，健康检查路径 `/api/status`，Node 24。部署完成后使用平台返回的 HTTPS URL；仅在工作区启动不代表已经发布。
 
@@ -117,3 +117,9 @@ DEMO_DEBUG=1 npm run smoke:codex
 `npm run build` 将同一组页面与 `worker/handler.js` 打包为 `dist/server/index.js`，并保留 `.openai/hosting.json` 中的站点标识。Node 入口继续用于本地和 Render。Sites 的运行时变量需单独设置；环境变量不会从开发工作区自动同步。
 
 Workers 的调用成功记录和限流计数只保留在当前 isolate 内，不跨实例持久化。
+
+## DeepSeek 配置
+
+`AI_BASE_URL=https://api.deepseek.com`，`AI_MODEL=deepseek-flash`，并配置服务端秘密 `AI_API_KEY` 与 `CHAT_ACCESS_TOKEN`。以 [DeepSeek 官方文档](https://api-docs.deepseek.com/)为准。以上四项在 Sites 生产环境中独立配置，不会自动读取本地 `.env`。
+
+如未配置任何 `AI_*` 变量，保留旧版 `OPENAI_API_KEY` / `OPENAI_MODEL` 的兼容行为。一旦存在 `AI_*` 配置，不会复用旧版密钥，避免发给错误的服务商。服务地址必须使用 HTTPS，不接受嵌入凭据、查询参数或重定向。

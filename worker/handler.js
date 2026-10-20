@@ -1,3 +1,4 @@
+import { aiConfig, chatPayload } from '../src/ai-config.js';
 // Fetch adapter for Sites / Cloudflare Workers. Node server remains available for Render.
 export function createWorker(assets, fetchImpl = fetch) {
   let lastSuccess = null;
@@ -11,8 +12,9 @@ export function createWorker(assets, fetchImpl = fetch) {
   const json = (data, status = 200) => Response.json(data, { status, headers });
   return { async fetch(request, env) {
     const path = new URL(request.url).pathname;
-    const configured = !!(env.OPENAI_API_KEY && env.OPENAI_MODEL && env.CHAT_ACCESS_TOKEN);
-    if (request.method === 'GET' && path === '/api/status') return json({ web: 'online', ai: configured ? 'configured' : 'unconfigured', model: env.OPENAI_MODEL || null, lastSuccess });
+    const config = aiConfig(env);
+    const configured = config.configured;
+    if (request.method === 'GET' && path === '/api/status') return json({ web: 'online', ai: configured ? 'configured' : 'unconfigured', model: config.model || null, provider: config.provider, lastSuccess });
     if (request.method === 'GET' && assets[path]) {
       const [type, body] = assets[path];
       return new Response(body, {headers:{...headers, 'Content-Type':type+'; charset=utf-8'}});
@@ -36,9 +38,9 @@ export function createWorker(assets, fetchImpl = fetch) {
       const bytes=new Uint8Array(size);let offset=0;for(const c of chunks){bytes.set(c,offset);offset+=c.byteLength;}
       let messages;try{({messages}=JSON.parse(new TextDecoder().decode(bytes)));}catch{return json({error:'请求格式错误。'},400);}
       if(!Array.isArray(messages)||!messages.length||messages.length>40||messages.at(-1)?.role!=='user'||messages.some(m=>!m||!['user','assistant'].includes(m.role)||typeof m.content!=='string'||!m.content.trim()||m.content.length>8000)) return json({error:'消息无效：最多 40 条，每条最多 8000 字。'},400);
-      const upstream=await fetchImpl('https://api.openai.com/v1/chat/completions',{
-        method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},
-        body:JSON.stringify({model:env.OPENAI_MODEL,messages:messages.map(({role,content})=>({role,content})),max_completion_tokens:2048,store:false}),signal:AbortSignal.timeout(60_000)
+      const upstream=await fetchImpl(config.endpoint,{
+        method:'POST',redirect:'error',headers:{Authorization:`Bearer ${config.key}`,'Content-Type':'application/json'},
+        body:JSON.stringify(chatPayload(config,messages)),signal:AbortSignal.timeout(60_000)
       });
       if(!upstream.ok) return json({error:upstream.status===429?'模型服务额度不足或请求过多，请检查额度后重试。':'模型服务调用失败，请检查服务端密钥和模型权限。'},502);
       const data=await upstream.json(); const reply=data.choices?.[0]?.message?.content;

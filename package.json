@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node --env-file-if-exists=.env src/server.js",
-    "test": "node --test test/client.test.js test/server.test.js test/worker.test.js",
+    "test": "node --test test/client.test.js test/server.test.js test/worker.test.js test/ai-config.test.js",
     "test:integration": "node --test test/integration.test.js",
     "check": "node --check src/client.js && node --check src/smoke.js && node --check src/server.js && node --check public/app.js && node --check public/status.js && npm test",
     "smoke:codex": "node src/smoke.js",

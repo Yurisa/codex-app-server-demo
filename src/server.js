@@ -1,3 +1,4 @@
+import { aiConfig, chatPayload } from './ai-config.js';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { timingSafeEqual } from 'node:crypto';
@@ -7,13 +8,14 @@ export function createApp({ env = process.env, fetchImpl = fetch } = {}) {
   let lastSuccess = null;
   let active = 0;
   let requests = [];
-  const configured = () => Boolean(env.OPENAI_API_KEY && env.OPENAI_MODEL && env.CHAT_ACCESS_TOKEN);
+  const config = aiConfig(env);
+  const configured = () => config.configured;
   const json = (res, status, data) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(data)); };
   return createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Security-Policy', "default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
     const path = new URL(req.url, 'http://localhost').pathname;
-    if (req.method === 'GET' && path === '/api/status') return json(res, 200, { web: 'online', ai: configured() ? 'configured' : 'unconfigured', model: env.OPENAI_MODEL || null, lastSuccess });
+    if (req.method === 'GET' && path === '/api/status') return json(res, 200, { web: 'online', ai: configured() ? 'configured' : 'unconfigured', model: config.model || null, provider: config.provider, lastSuccess });
     if (req.method === 'POST' && path === '/api/chat') {
       if (!configured()) return json(res, 503, { error: 'AI 尚未配置，请在服务端设置 API 密钥、模型和应用访问口令。' });
       const expected = Buffer.from(`Bearer ${env.CHAT_ACCESS_TOKEN}`);
@@ -34,9 +36,9 @@ export function createApp({ env = process.env, fetchImpl = fetch } = {}) {
         let messages;
         try { ({ messages } = JSON.parse(body)); } catch { return json(res, 400, { error: '请求格式错误。' }); }
         if (!Array.isArray(messages) || !messages.length || messages.length > 40 || messages.at(-1)?.role !== 'user' || messages.some(m => !m || !['user', 'assistant'].includes(m.role) || typeof m.content !== 'string' || !m.content.trim() || m.content.length > 8000)) return json(res, 400, { error: '消息无效：最多 40 条，每条最多 8000 字。' });
-        const upstream = await fetchImpl('https://api.openai.com/v1/chat/completions', {
-          method: 'POST', headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: env.OPENAI_MODEL, messages: messages.map(({role, content}) => ({role, content})), max_completion_tokens: 2048, store: false }),
+        const upstream = await fetchImpl(config.endpoint, {
+          method: 'POST', redirect: 'error', headers: { Authorization: `Bearer ${config.key}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(chatPayload(config, messages)),
           signal: AbortSignal.timeout(60_000)
         });
         if (!upstream.ok) return json(res, 502, { error: upstream.status === 429 ? '模型服务额度不足或请求过多，请检查额度后重试。' : '模型服务调用失败，请检查服务端密钥和模型权限。' });
