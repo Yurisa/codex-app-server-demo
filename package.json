@@ -1,0 +1,14 @@
+{
+  "name": "codex-app-server-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A dependency-free Codex app-server stdio protocol test project",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "start": "node src/smoke.js",
+    "test": "node --test test/client.test.js",
+    "test:integration": "node --test test/integration.test.js",
+    "check": "node --check src/client.js && node --check src/smoke.js && npm test"
+  }
+}
