@@ -1,3 +1,4 @@
+import { isOwner, settingsReady, readSettings, settingsResponse } from './settings.js';
 import { aiConfig, chatPayload } from '../src/ai-config.js';
 // Fetch adapter for Sites / Cloudflare Workers. Node server remains available for Render.
 export function createWorker(assets, fetchImpl = fetch) {
@@ -12,7 +13,15 @@ export function createWorker(assets, fetchImpl = fetch) {
   const json = (data, status = 200) => Response.json(data, { status, headers });
   return { async fetch(request, env) {
     const path = new URL(request.url).pathname;
-    const config = aiConfig(env);
+    if(path === '/api/settings') return settingsResponse(request,env,json);
+    if(path === '/settings' && !isOwner(request,env)) return json({error:'仅站点所有者登录后可管理配置。'},403);
+    let effectiveEnv=env;
+    if(path === '/api/chat' || path === '/api/status') {
+      if(env.SETTINGS_OWNER_EMAIL && !isOwner(request,env)) return json({error:'请以站点所有者身份登录。'},403);
+      try {const saved=await readSettings(env);if(saved) effectiveEnv={...env,...saved};}
+      catch {return json({error:'无法读取 AI 配置，请稍后重试。'},503);}
+    }
+    const config = aiConfig(effectiveEnv);
     const configured = config.configured;
     if (request.method === 'GET' && path === '/api/status') return json({ web: 'online', ai: configured ? 'configured' : 'unconfigured', model: config.model || null, provider: config.provider, lastSuccess });
     if (request.method === 'GET' && assets[path]) {
@@ -20,9 +29,9 @@ export function createWorker(assets, fetchImpl = fetch) {
       return new Response(body, {headers:{...headers, 'Content-Type':type+'; charset=utf-8'}});
     }
     if (request.method !== 'POST' || path !== '/api/chat') return json({error:'页面不存在。'},404);
-    if (!configured) return json({error:'AI 尚未配置，请在服务端设置 API 密钥、模型和应用访问口令。'},503);
+    if (!configured) return json({error:'AI 尚未配置，请打开「AI 配置」页面设置密钥和访问口令。'},503);
     const hash = async s => new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)));
-    const [expected, supplied] = await Promise.all([hash(`Bearer ${env.CHAT_ACCESS_TOKEN}`), hash(request.headers.get('Authorization') || '')]);
+    const [expected, supplied] = await Promise.all([hash(`Bearer ${effectiveEnv.CHAT_ACCESS_TOKEN}`), hash(request.headers.get('Authorization') || '')]);
     let mismatch = 0; for(let i=0;i<expected.length;i++) mismatch |= expected[i]^supplied[i];
     if(mismatch) return json({error:'访问口令不正确，请检查后重试。'},401);
     if(request.headers.get('sec-fetch-site') === 'cross-site') return json({error:'不允许跨站请求。'},403);

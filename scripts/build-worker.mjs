@@ -1,8 +1,9 @@
 import {readFile, mkdir, writeFile, copyFile} from 'node:fs/promises';
 const assets={};
-for(const [route,file,type] of [['/','index.html','text/html'],['/status','status.html','text/html'],['/style.css','style.css','text/css'],['/app.js','app.js','text/javascript'],['/status.js','status.js','text/javascript']]) assets[route]=[type,await readFile(new URL('../public/'+file,import.meta.url),'utf8')];
+for(const [route,file,type] of [['/','index.html','text/html'],['/status','status.html','text/html'],['/style.css','style.css','text/css'],['/app.js','app.js','text/javascript'],['/status.js','status.js','text/javascript'],['/settings','settings.html','text/html'],['/settings.js','settings.js','text/javascript']]) assets[route]=[type,await readFile(new URL('../public/'+file,import.meta.url),'utf8')];
 const shared=await readFile(new URL('../src/ai-config.js',import.meta.url),'utf8');
-const handler=shared+'\n'+(await readFile(new URL('../worker/handler.js',import.meta.url),'utf8')).replace(/^import .*ai-config.js';\n/m, '');
+const settings=await readFile(new URL('../worker/settings.js',import.meta.url),'utf8');
+const handler=shared+'\n'+settings+'\n'+(await readFile(new URL('../worker/handler.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm, '');
 await mkdir('dist/server',{recursive:true});await mkdir('dist/.openai',{recursive:true});
 await writeFile('dist/server/index.js',handler+'\nexport default createWorker('+JSON.stringify(assets)+');\n');
 await copyFile('.openai/hosting.json','dist/.openai/hosting.json');

@@ -123,3 +123,11 @@ Workers 的调用成功记录和限流计数只保留在当前 isolate 内，不
 `AI_BASE_URL=https://api.deepseek.com`，`AI_MODEL=deepseek-flash`，并配置服务端秘密 `AI_API_KEY` 与 `CHAT_ACCESS_TOKEN`。以 [DeepSeek 官方文档](https://api-docs.deepseek.com/)为准。以上四项在 Sites 生产环境中独立配置，不会自动读取本地 `.env`。
 
 如未配置任何 `AI_*` 变量，保留旧版 `OPENAI_API_KEY` / `OPENAI_MODEL` 的兼容行为。一旦存在 `AI_*` 配置，不会复用旧版密钥，避免发给错误的服务商。服务地址必须使用 HTTPS，不接受嵌入凭据、查询参数或重定向。
+
+## 在线配置页
+
+已发布站点的 `/settings` 允许站点所有者填写 DeepSeek 密钥、模型和应用访问口令，保存后立即生效。Sites 注入的登录邮箱必须匹配服务端 `SETTINGS_OWNER_EMAIL`；即使以后扩大站点访问范围，其他访问者也不能管理配置或使用该所有者的模型凭据。
+
+配置使用 AES-256-GCM 加密后写入 R2 `BUCKET`，加密主密钥 `SETTINGS_ENCRYPTION_KEY` 为独立的运行时秘密，不在源码中。不要随意替换主密钥，否则已有配置将无法解密。配置接口不返回密钥或访问口令，不使用浏览器存储，并校验同源 POST。当前仅配置 DeepSeek 官方地址，防止已存密钥被转发到其他主机。空白秘密字段表示保留已有值。
+
+本地 Node/Render 入口继续使用环境变量，不提供在线保存；在线设置依赖 Sites 身份验证和 R2。保存配置不验证模型额度，请发起真实聊天验证。

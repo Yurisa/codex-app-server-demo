@@ -15,6 +15,7 @@ export function createApp({ env = process.env, fetchImpl = fetch } = {}) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Security-Policy', "default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
     const path = new URL(req.url, 'http://localhost').pathname;
+    if (path === '/api/settings') return json(res, 503, {error:'网页配置功能仅在已发布的 Sites 站点提供；本地运行请使用 .env。'});
     if (req.method === 'GET' && path === '/api/status') return json(res, 200, { web: 'online', ai: configured() ? 'configured' : 'unconfigured', model: config.model || null, provider: config.provider, lastSuccess });
     if (req.method === 'POST' && path === '/api/chat') {
       if (!configured()) return json(res, 503, { error: 'AI 尚未配置，请在服务端设置 API 密钥、模型和应用访问口令。' });
@@ -51,7 +52,7 @@ export function createApp({ env = process.env, fetchImpl = fetch } = {}) {
         return json(res, error.name === 'TimeoutError' ? 504 : 502, { error: error.name === 'TimeoutError' ? '模型响应超时，请重试。' : '无法连接模型服务，请稍后重试。' });
       } finally { active--; }
     }
-    const files = { '/': ['index.html', 'text/html'], '/status': ['status.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/status.js': ['status.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
+    const files = { '/settings': ['settings.html', 'text/html'], '/settings.js': ['settings.js', 'text/javascript'], '/': ['index.html', 'text/html'], '/status': ['status.html', 'text/html'], '/app.js': ['app.js', 'text/javascript'], '/status.js': ['status.js', 'text/javascript'], '/style.css': ['style.css', 'text/css'] };
     if (req.method === 'GET' && files[path]) {
       try {
         const [file, mime] = files[path];
