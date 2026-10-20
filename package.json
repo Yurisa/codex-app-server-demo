@@ -3,12 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A dependency-free Codex app-server stdio protocol test project",
-  "engines": { "node": ">=24" },
+  "description": "AI chat web app with a preserved Codex app-server protocol demo",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
-    "start": "node src/smoke.js",
-    "test": "node --test test/client.test.js",
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "test": "node --test test/client.test.js test/server.test.js test/worker.test.js",
     "test:integration": "node --test test/integration.test.js",
-    "check": "node --check src/client.js && node --check src/smoke.js && npm test"
+    "check": "node --check src/client.js && node --check src/smoke.js && node --check src/server.js && node --check public/app.js && node --check public/status.js && npm test",
+    "smoke:codex": "node src/smoke.js",
+    "build": "node scripts/build-worker.mjs"
   }
 }

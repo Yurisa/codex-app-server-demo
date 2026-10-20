@@ -1,3 +1,45 @@
+# 知言 · AI 聊天应用
+
+在原有 Codex app-server 测试项目中增加了网页应用，原协议客户端与测试保留。
+
+## 启动聊天应用
+
+```bash
+npm ci
+cp .env.example .env
+# 在 .env 中填写 OPENAI_API_KEY、OPENAI_MODEL、CHAT_ACCESS_TOKEN
+npm start
+```
+
+打开 `http://localhost:3000` 聊天；`http://localhost:3000/status` 查看运行状态。
+无需配置密钥即可打开页面；真实聊天必须配置以上三项。访问口令由你自行设置，与模型 API 密钥不同，在聊天页输入。不要把 API 密钥放进网页或提交到 Git。
+
+- 多轮聊天保留在当前页面内存，刷新、新建对话后清除，不写入浏览器存储。
+- 使用 OpenAI Chat Completions 文本接口，模型名称由环境变量指定。
+- 失败消息恢复到输入框，服务端超时 60 秒，单条最多 8000 字，一次最多 40 条。
+- 服务端最多并发 3 次调用，每进程每分钟最多 20 次请求；多实例部署需要共享限流。
+- `/api/status` 只证明服务在线。AI 已配置不代表有额度或调用成功；成功调用记录随进程重启清除。
+
+## 发布到 Render
+
+仓库已包含 `render.yaml`。在 Render 创建 Blueprint 并选择此仓库，填写 `OPENAI_API_KEY` 和 `OPENAI_MODEL`。平台生成 `CHAT_ACCESS_TOKEN`，从环境变量设置中获取后用于聊天页。应用读取平台提供的 `PORT`，监听 `0.0.0.0`。
+
+也可以手动创建 Node Web Service：构建命令 `npm ci`，启动命令 `npm start`，健康检查路径 `/api/status`，Node 24。部署完成后使用平台返回的 HTTPS URL；仅在工作区启动不代表已经发布。
+
+免费服务存在休眠及额度限制，模型调用费用另计。当前没有真实模型凭据，测试使用模拟响应；上线前应发送一条真实消息验证。托管配置本身不意味着已经完成部署。
+
+API 契约参考：[OpenAI Chat Completions](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create)。
+
+## 验证
+
+```bash
+npm run check
+```
+
+包括原协议测试和网页接口测试（鉴权、配置状态、消息校验、大小限制、模型错误与超时）。
+
+---
+
 # Codex app-server 测试项目
 
 使用 Node.js 通过 **stdio / 换行分隔的 JSON-RPC 消息**连接真实的 `codex app-server`，可作为自建客户端的最小起点。项目没有第三方 npm 依赖。
@@ -15,10 +57,10 @@
 npm ci
 npm run check
 npm run test:integration
-npm start
+npm run smoke:codex
 ```
 
-`npm start` 启动一个子进程，依次执行以下检查，打印 JSON 结果后关闭进程：
+`npm run smoke:codex` 启动一个子进程，依次执行以下检查，打印 JSON 结果后关闭进程：
 
 1. `initialize`：校验服务端返回的 `userAgent`。
 2. `initialized`：发送客户端就绪通知。
@@ -54,13 +96,13 @@ npm start
 自定义 CLI 路径：
 
 ```bash
-CODEX_BIN=/absolute/path/to/codex npm start
+CODEX_BIN=/absolute/path/to/codex npm run smoke:codex
 ```
 
 排查服务端启动问题：
 
 ```bash
-DEMO_DEBUG=1 npm start
+DEMO_DEBUG=1 npm run smoke:codex
 ```
 
 默认请求超时为 20 秒，集成测试总超时为 70 秒。CLI 版本更新可能改变协议，可通过 `codex app-server generate-json-schema --out /tmp/codex-schema` 检查本机协议。
@@ -69,3 +111,9 @@ DEMO_DEBUG=1 npm start
 
 - [官方 app-server 文档](https://developers.openai.com/codex/app-server/)
 - [Codex 源码与协议说明](https://github.com/openai/codex/tree/main/codex-rs/app-server)
+
+## Sites 发布构建
+
+`npm run build` 将同一组页面与 `worker/handler.js` 打包为 `dist/server/index.js`，并保留 `.openai/hosting.json` 中的站点标识。Node 入口继续用于本地和 Render。Sites 的运行时变量需单独设置；环境变量不会从开发工作区自动同步。
+
+Workers 的调用成功记录和限流计数只保留在当前 isolate 内，不跨实例持久化。

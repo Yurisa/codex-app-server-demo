@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: codex-ai-chat
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/status
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        sync: false
+      - key: CHAT_ACCESS_TOKEN
+        generateValue: true
