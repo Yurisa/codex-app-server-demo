@@ -30,3 +30,9 @@ test('timeouts and empty model output never count as successful inference',async
  const base=await start(t,{env,fetchImpl});const r=await post(base,{messages:[{role:'user',content:'hi'}]});assert.ok([502,504].includes(r.status));assert.equal((await (await fetch(base+'/api/status')).json()).lastSuccess,null);
  }
 });
+test('codex backend routes authenticated messages through app-server, not direct fetch',async t=>{
+ let called=false;const base=await start(t,{env:{AI_API_KEY:'ds-key',AI_MODEL:'deepseek-flash',CHAT_ACCESS_TOKEN:'test-access',CHAT_BACKEND:'codex'},fetchImpl:()=>{throw Error('Direct API must not be used');},codexChatImpl:async(messages,options)=>{called=true;assert.equal(messages[0].content,'hello');assert.equal(options.env.AI_API_KEY,'ds-key');return {reply:'via Codex',threadId:'thread-1',turnId:'turn-1',backend:'codex-app-server'};}});
+ assert.equal((await post(base,{messages:[{role:'user',content:'hello'}]},'wrong')).status,401);assert.equal(called,false);
+ const r=await post(base,{messages:[{role:'user',content:'hello'}]});assert.equal(r.status,200);assert.equal((await r.json()).backend,'codex-app-server');assert.ok(called);
+ assert.equal((await (await fetch(base+'/api/status')).json()).backend,'codex-app-server');
+});

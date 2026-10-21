@@ -2,7 +2,7 @@ const $ = s => document.querySelector(s);
 let history = [], busy = false, ready = false;
 function bubble(role, content) { const item = document.createElement('article'); item.className = `message ${role}`; const label = document.createElement('b'); label.textContent = role === 'user' ? '你' : '✳ 知言'; const text = document.createElement('div'); text.textContent = content; item.append(label, text); $('#messages').append(item); item.scrollIntoView({block:'end', behavior:'smooth'}); return item; }
 async function status() {
-  try { const r = await fetch('/api/status'); if (!r.ok) throw Error(); const s = await r.json(); ready = s.ai === 'configured'; $('#connection').textContent = ready ? '● AI 已配置' : '○ AI 待配置'; $('#notice').textContent = ready ? '输入应用访问口令后，即可开始对话。' : '网页服务已运行。AI 尚未配置，请查看「部署与连接状态」。'; }
+  try { const r = await fetch('/api/status'); if (!r.ok) throw Error(); const s = await r.json(); ready = s.ai === 'configured'; $('#connection').textContent = ready ? (s.backend === 'codex-app-server' ? '● Codex · DeepSeek' : '● AI 已配置') : '○ AI 待配置'; $('#notice').textContent = ready ? '输入应用访问口令后，即可开始对话。' : '网页服务已运行。AI 尚未配置，请查看「部署与连接状态」。'; }
   catch { $('#connection').textContent = '○ 连接异常'; $('#notice').textContent = '无法连接应用服务，请刷新页面重试。'; }
   $('#send').disabled = !ready || busy;
 }

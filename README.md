@@ -2,6 +2,8 @@
 
 在原有 Codex app-server 测试项目中增加了网页应用，原协议客户端与测试保留。
 
+新增 **Codex app-server + DeepSeek** Node 后端：设置 `CHAT_BACKEND=codex`，网页请求将通过真实 app-server 的线程和 turn 调用 DeepSeek Responses API。[启动、验证和部署说明](docs/app-server-deepseek.md)。现有 Sites 网站仍使用直接 API 路径。
+
 ## 启动聊天应用
 
 ```bash

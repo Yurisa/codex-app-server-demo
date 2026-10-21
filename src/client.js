@@ -11,10 +11,10 @@ export class AppServerClient extends EventEmitter {
   #timeout;
   #exited;
 
-  constructor({ command = process.env.CODEX_BIN || 'codex', args = ['app-server', '--listen', 'stdio://'], timeout = 20_000, env = process.env } = {}) {
+  constructor({ command = process.env.CODEX_BIN || 'codex', args = ['app-server', '--listen', 'stdio://'], timeout = 20_000, env = process.env, cwd } = {}) {
     super();
     this.#timeout = timeout;
-    this.#child = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'], env });
+    this.#child = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'], env, cwd });
     this.#exited = new Promise(resolve => this.#child.once('close', resolve));
     this.#child.once('error', error => this.#fail(error));
     this.#child.once('close', code => this.#fail(new Error(`app-server exited (${code})`)));
@@ -31,7 +31,9 @@ export class AppServerClient extends EventEmitter {
   }
 
   #fail(error) {
+    const wasClosed = this.#closed;
     this.#closed = true;
+    if (!wasClosed) this.emit('disconnect', error);
     for (const { reject, timer } of this.#pending.values()) {
       clearTimeout(timer);
       reject(error);

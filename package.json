@@ -11,8 +11,13 @@
     "start": "node --env-file-if-exists=.env src/server.js",
     "test": "node --test test/client.test.js test/server.test.js test/worker.test.js test/ai-config.test.js test/settings.test.js",
     "test:integration": "node --test test/integration.test.js",
-    "check": "node --check src/client.js && node --check src/smoke.js && node --check src/server.js && node --check public/app.js && node --check public/status.js && node --check public/settings.js && npm test",
+    "check": "node --check src/client.js && node --check src/smoke.js && node --check src/server.js && node --check public/app.js && node --check public/status.js && node --check public/settings.js && node --check src/codex-chat.js && npm test",
     "smoke:codex": "node src/smoke.js",
-    "build": "node scripts/build-worker.mjs"
+    "build": "node scripts/build-worker.mjs",
+    "test:codex-chat": "node --test test/codex-chat.integration.test.js",
+    "smoke:deepseek": "node --env-file-if-exists=.env scripts/smoke-deepseek.mjs"
+  },
+  "dependencies": {
+    "@openai/codex": "0.163.0"
   }
 }

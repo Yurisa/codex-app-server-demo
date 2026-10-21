@@ -1,14 +1,17 @@
+import { codexChat } from './codex-chat.js';
 import { aiConfig, chatPayload } from './ai-config.js';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { timingSafeEqual } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 
-export function createApp({ env = process.env, fetchImpl = fetch } = {}) {
+export function createApp({ env = process.env, fetchImpl = fetch, codexChatImpl = codexChat } = {}) {
+  const backend = env.CHAT_BACKEND || 'direct';
+  if(!['direct','codex'].includes(backend)) throw new Error('CHAT_BACKEND must be direct or codex');
   let lastSuccess = null;
   let active = 0;
   let requests = [];
-  const config = aiConfig(env);
+  const config = aiConfig(backend === 'codex' ? {...env, AI_BASE_URL:'https://api.deepseek.com', AI_MODEL:env.AI_MODEL || 'deepseek-flash', AI_API_KEY:env.AI_API_KEY || ''} : env);
   const configured = () => config.configured;
   const json = (res, status, data) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(data)); };
   return createServer(async (req, res) => {
@@ -16,7 +19,7 @@ export function createApp({ env = process.env, fetchImpl = fetch } = {}) {
     res.setHeader('Content-Security-Policy', "default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
     const path = new URL(req.url, 'http://localhost').pathname;
     if (path === '/api/settings') return json(res, 503, {error:'网页配置功能仅在已发布的 Sites 站点提供；本地运行请使用 .env。'});
-    if (req.method === 'GET' && path === '/api/status') return json(res, 200, { web: 'online', ai: configured() ? 'configured' : 'unconfigured', model: config.model || null, provider: config.provider, lastSuccess });
+    if (req.method === 'GET' && path === '/api/status') return json(res, 200, { web: 'online', ai: configured() ? 'configured' : 'unconfigured', model: config.model || null, provider: config.provider, backend: backend === 'codex' ? 'codex-app-server' : 'direct', lastSuccess });
     if (req.method === 'POST' && path === '/api/chat') {
       if (!configured()) return json(res, 503, { error: 'AI 尚未配置，请在服务端设置 API 密钥、模型和应用访问口令。' });
       const expected = Buffer.from(`Bearer ${env.CHAT_ACCESS_TOKEN}`);
@@ -37,6 +40,17 @@ export function createApp({ env = process.env, fetchImpl = fetch } = {}) {
         let messages;
         try { ({ messages } = JSON.parse(body)); } catch { return json(res, 400, { error: '请求格式错误。' }); }
         if (!Array.isArray(messages) || !messages.length || messages.length > 40 || messages.at(-1)?.role !== 'user' || messages.some(m => !m || !['user', 'assistant'].includes(m.role) || typeof m.content !== 'string' || !m.content.trim() || m.content.length > 8000)) return json(res, 400, { error: '消息无效：最多 40 条，每条最多 8000 字。' });
+        if (backend === 'codex') {
+          const controller=new AbortController();
+          const disconnected=()=>{if(!res.writableEnded)controller.abort();};
+          res.on('close',disconnected);
+          try {
+            const result=await codexChatImpl(messages,{env,signal:controller.signal});
+            lastSuccess=new Date().toISOString();
+            return json(res,200,result);
+          } catch { return json(res,502,{error:'Codex app-server 调用失败，请检查 CLI 安装、DeepSeek 密钥和模型权限。'}); }
+          finally {res.off('close',disconnected);}
+        }
         const upstream = await fetchImpl(config.endpoint, {
           method: 'POST', redirect: 'manual', headers: { Authorization: `Bearer ${config.key}`, 'Content-Type': 'application/json' },
           body: JSON.stringify(chatPayload(config, messages)),
