@@ -12,7 +12,7 @@ test('provider credentials are isolated and invalid URLs fail closed',()=>{
  const payload=chatPayload(aiConfig(env),[{role:'user',content:'你好'}]);assert.equal(payload.max_tokens,2048);assert.equal(payload.thinking.type,'disabled');assert.ok(!('store' in payload));assert.ok(!('max_completion_tokens' in payload));
 });
 for(const runtime of ['node','worker']) test(`${runtime} sends DeepSeek-compatible requests and reports provider without key`,async t=>{
- let calls=0;const upstream=async(url,options)=>{calls++;assert.equal(url,'https://api.deepseek.com/chat/completions');assert.equal(options.headers.Authorization,'Bearer deepseek-secret');assert.equal(options.redirect,'error');assert.equal(JSON.parse(options.body).max_tokens,2048);return Response.json({choices:[{message:{content:'你好'}}]});};
+ let calls=0;const upstream=async(url,options)=>{calls++;assert.equal(url,'https://api.deepseek.com/chat/completions');assert.equal(options.headers.Authorization,'Bearer deepseek-secret');assert.equal(options.redirect,'manual');assert.equal(JSON.parse(options.body).max_tokens,2048);return Response.json({choices:[{message:{content:'你好'}}]});};
  let call;
  if(runtime==='node'){const app=createApp({env,fetchImpl:upstream});await new Promise(r=>app.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>app.close(r)));call=(path,options)=>fetch(`http://127.0.0.1:${app.address().port}${path}`,options);}
  else {const app=createWorker({},upstream);call=(path,options)=>app.fetch(new Request('https://example.com'+path,options),env);}

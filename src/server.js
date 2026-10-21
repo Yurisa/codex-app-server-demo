@@ -38,7 +38,7 @@ export function createApp({ env = process.env, fetchImpl = fetch } = {}) {
         try { ({ messages } = JSON.parse(body)); } catch { return json(res, 400, { error: '请求格式错误。' }); }
         if (!Array.isArray(messages) || !messages.length || messages.length > 40 || messages.at(-1)?.role !== 'user' || messages.some(m => !m || !['user', 'assistant'].includes(m.role) || typeof m.content !== 'string' || !m.content.trim() || m.content.length > 8000)) return json(res, 400, { error: '消息无效：最多 40 条，每条最多 8000 字。' });
         const upstream = await fetchImpl(config.endpoint, {
-          method: 'POST', redirect: 'error', headers: { Authorization: `Bearer ${config.key}`, 'Content-Type': 'application/json' },
+          method: 'POST', redirect: 'manual', headers: { Authorization: `Bearer ${config.key}`, 'Content-Type': 'application/json' },
           body: JSON.stringify(chatPayload(config, messages)),
           signal: AbortSignal.timeout(60_000)
         });

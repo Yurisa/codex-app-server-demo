@@ -48,14 +48,18 @@ export function createWorker(assets, fetchImpl = fetch) {
       let messages;try{({messages}=JSON.parse(new TextDecoder().decode(bytes)));}catch{return json({error:'请求格式错误。'},400);}
       if(!Array.isArray(messages)||!messages.length||messages.length>40||messages.at(-1)?.role!=='user'||messages.some(m=>!m||!['user','assistant'].includes(m.role)||typeof m.content!=='string'||!m.content.trim()||m.content.length>8000)) return json({error:'消息无效：最多 40 条，每条最多 8000 字。'},400);
       const upstream=await fetchImpl(config.endpoint,{
-        method:'POST',redirect:'error',headers:{Authorization:`Bearer ${config.key}`,'Content-Type':'application/json'},
+        method:'POST',redirect:'manual',headers:{Authorization:`Bearer ${config.key}`,'Content-Type':'application/json'},
         body:JSON.stringify(chatPayload(config,messages)),signal:AbortSignal.timeout(60_000)
       });
-      if(!upstream.ok) return json({error:upstream.status===429?'模型服务额度不足或请求过多，请检查额度后重试。':'模型服务调用失败，请检查服务端密钥和模型权限。'},502);
+      if(!upstream.ok) {
+        const messages={400:'模型请求参数不受支持，请检查模型名称。',401:'DeepSeek 密钥无效，请在 AI 配置页更新。',402:'DeepSeek 账户余额不足，请充值后重试。',403:'模型服务拒绝访问，请检查账号权限。',404:'模型或接口不存在，请检查模型名称。',429:'模型请求过多，请稍后重试。'};
+        console.error(JSON.stringify({event:'ai_upstream_error',status:upstream.status}));
+        return json({error:upstream.status>=300&&upstream.status<400?'模型接口返回重定向，已停止请求以保护密钥。':messages[upstream.status]||'模型服务暂时不可用，请稍后重试。',code:'UPSTREAM_HTTP_'+upstream.status},502);
+      }
       const data=await upstream.json(); const reply=data.choices?.[0]?.message?.content;
       if(typeof reply!=='string'||!reply.trim()) return json({error:'模型未返回文本，请重试。'},502);
       lastSuccess=new Date().toISOString();return json({reply});
-    }catch(error){return json({error:error.name==='TimeoutError'?'模型响应超时，请重试。':'无法连接模型服务，请稍后重试。'},error.name==='TimeoutError'?504:502);}
+    }catch(error){console.error(JSON.stringify({event:'ai_request_failed',kind:error.name==='TimeoutError'?'timeout':error instanceof SyntaxError?'invalid_json':'transport_or_runtime'}));return json({error:error.name==='TimeoutError'?'模型响应超时，请重试。':'无法连接模型服务，请稍后重试。'},error.name==='TimeoutError'?504:502);}
     finally{active--;}
   }};
 }

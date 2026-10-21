@@ -20,3 +20,10 @@ test('Worker authenticates, validates, limits input, and records successful call
 test('Worker hides provider errors and never marks failed inference successful',async()=>{
  const app=createWorker({},async()=>new Response('provider secret',{status:401}));const r=await app.fetch(req([{role:'user',content:'hi'}]),env);assert.equal(r.status,502);assert.ok(!(await r.text()).includes('provider secret'));assert.equal((await (await app.fetch(new Request('https://example.com/api/status'),env)).json()).lastSuccess,null);
 });
+test('Worker uses supported redirect mode and never follows provider redirects',async()=>{
+ let calls=0;const app=createWorker({},async(url,options)=>{calls++;if(options.redirect==='error')throw new TypeError('Unsupported redirect mode');assert.equal(options.redirect,'manual');return new Response(null,{status:307,headers:{location:'https://other.example'}});});
+ const r=await app.fetch(req([{role:'user',content:'hello'}]),env);assert.equal(r.status,502);assert.equal((await r.json()).code,'UPSTREAM_HTTP_307');assert.equal(calls,1);
+});
+test('Worker distinguishes invalid credentials and insufficient balance',async()=>{
+ for(const status of [401,402]){const app=createWorker({},async()=>new Response('private provider details',{status}));const r=await app.fetch(req([{role:'user',content:'hello'}]),env);const data=await r.json();assert.equal(data.code,`UPSTREAM_HTTP_${status}`);assert.ok(!data.error.includes('private provider'));}
+});
